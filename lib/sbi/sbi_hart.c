@@ -199,7 +199,8 @@ static int delegate_traps(struct sbi_scratch *scratch)
 		return 0;
 
 	/* Send M-mode interrupts and most exceptions to S-mode */
-	interrupts = MIP_SSIP | MIP_STIP | MIP_SEIP;
+	interrupts = MIP_SSIP | MIP_STIP;
+	//interrupts = MIP_SSIP | MIP_STIP | MIP_SEIP;
 	interrupts |= sbi_pmu_irq_bit();
 
 	exceptions = (1U << CAUSE_MISALIGNED_FETCH) | (1U << CAUSE_BREAKPOINT) |
@@ -226,6 +227,11 @@ static int delegate_traps(struct sbi_scratch *scratch)
 
 	csr_write(CSR_MIDELEG, interrupts);
 	csr_write(CSR_MEDELEG, exceptions);
+	csr_write(CSR_MVIP, 0);
+	csr_set(CSR_MVIEN, 1 << 14);
+	csr_set(CSR_MVIEN, 1 << 15);
+	csr_set(CSR_MVIEN, MIP_SEIP);
+	csr_set(CSR_MIE, MIP_SEIP);
 
 	return 0;
 }
@@ -241,6 +247,8 @@ void sbi_hart_delegation_dump(struct sbi_scratch *scratch,
 		   prefix, suffix, csr_read(CSR_MIDELEG));
 	sbi_printf("%sMEDELEG%s: 0x%" PRILX "\n",
 		   prefix, suffix, csr_read(CSR_MEDELEG));
+	sbi_printf("%sMVIEN%s:   0x%" PRILX "\n", prefix, suffix,
+		   csr_read(CSR_MVIEN));
 }
 
 unsigned int sbi_hart_mhpm_count(struct sbi_scratch *scratch)

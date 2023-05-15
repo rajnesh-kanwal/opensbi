@@ -217,6 +217,8 @@ static int sbi_trap_nonaia_irq(struct sbi_trap_regs *regs, ulong mcause)
 	return 0;
 }
 
+uint64_t cache_stopei[8];
+
 static int sbi_trap_aia_irq(struct sbi_trap_regs *regs, ulong mcause)
 {
 	int rc;
@@ -235,6 +237,12 @@ static int sbi_trap_aia_irq(struct sbi_trap_regs *regs, ulong mcause)
 			rc = sbi_irqchip_process(regs);
 			if (rc)
 				return rc;
+			break;
+		case IRQ_S_EXT:
+			/* Just insert the interrupt into S mode using mvip. */
+			cache_stopei[csr_read(CSR_MHARTID)] = csr_read(CSR_STOPEI);
+			csr_write(CSR_STOPEI, 0);
+			csr_set(CSR_MVIP, MIP_SEIP);
 			break;
 		default:
 			return SBI_ENOENT;
@@ -260,6 +268,7 @@ static int sbi_trap_aia_irq(struct sbi_trap_regs *regs, ulong mcause)
  *
  * @param regs pointer to register state
  */
+int count = 0;
 struct sbi_trap_regs *sbi_trap_handler(struct sbi_trap_regs *regs)
 {
 	int rc = SBI_ENOTSUPP;
@@ -272,6 +281,14 @@ struct sbi_trap_regs *sbi_trap_handler(struct sbi_trap_regs *regs)
 		mtval2 = csr_read(CSR_MTVAL2);
 		mtinst = csr_read(CSR_MTINST);
 	}
+
+    /* After 200 traps, inject virtual interrupts 14 and 15 into S mode. */
+	if (count == 1000) {
+		csr_set(CSR_MVIP, 1<<14);
+		csr_set(CSR_MVIP, 1<<15);
+	}
+
+	count++;
 
 	if (mcause & (1UL << (__riscv_xlen - 1))) {
 		if (sbi_hart_has_extension(sbi_scratch_thishart_ptr(),

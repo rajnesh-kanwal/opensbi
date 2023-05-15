@@ -42,6 +42,8 @@ static bool hpm_allowed(int hpm_num, ulong prev_mode, bool virt)
 	return ((cen >> hpm_num) & 1) ? TRUE : FALSE;
 }
 
+extern uint64_t cache_stopei[8];
+
 int sbi_emulate_csr_read(int csr_num, struct sbi_trap_regs *regs,
 			 ulong *csr_val)
 {
@@ -83,6 +85,13 @@ int sbi_emulate_csr_read(int csr_num, struct sbi_trap_regs *regs,
 		*csr_val = csr_read(CSR_MINSTRET);
 		break;
 
+	case CSR_SIREG:
+		*csr_val = csr_read(CSR_SIREG);
+		break;
+
+	case CSR_STOPEI:
+		*csr_val = cache_stopei[csr_read(CSR_MHARTID)];
+		break;
 #if __riscv_xlen == 32
 	case CSR_HTIMEDELTAH:
 		if (prev_mode == PRV_S && !virt)
@@ -184,6 +193,16 @@ int sbi_emulate_csr_write(int csr_num, struct sbi_trap_regs *regs,
 			ret = SBI_ENOTSUPP;
 		break;
 #endif
+
+	case CSR_SIREG:
+		csr_write(CSR_SIREG, csr_val);
+		break;
+
+	case CSR_STOPEI:
+		csr_clear(CSR_MVIP, MIP_SEIP);
+		cache_stopei[csr_read(CSR_MHARTID)] = 0;
+		break;
+
 	default:
 		ret = SBI_ENOTSUPP;
 		break;
