@@ -105,6 +105,11 @@ static void mstatus_init(struct sbi_scratch *scratch)
 		else
 			mstateen_val &= ~(SMSTATEEN0_SVSLCT);
 
+		if (sbi_hart_has_extension(scratch, SBI_HART_EXT_SSCTR))
+			mstateen_val |= SMSTATEEN0_CTR;
+		else
+			mstateen_val &= ~SMSTATEEN0_CTR;
+
 		csr_write(CSR_MSTATEEN0, mstateen_val);
 #if __riscv_xlen == 32
 		csr_write(CSR_MSTATEEN0H, mstateen_val >> 32);
@@ -680,6 +685,8 @@ const struct sbi_hart_ext_data sbi_hart_ext[] = {
 	__SBI_HART_EXT_DATA(ssccfg, SBI_HART_EXT_SSCCFG),
 	__SBI_HART_EXT_DATA(svade, SBI_HART_EXT_SVADE),
 	__SBI_HART_EXT_DATA(svadu, SBI_HART_EXT_SVADU),
+	__SBI_HART_EXT_DATA(smctr, SBI_HART_EXT_SMCTR),
+	__SBI_HART_EXT_DATA(ssctr, SBI_HART_EXT_SSCTR),
 };
 
 _Static_assert(SBI_HART_EXT_MAX == array_size(sbi_hart_ext),
@@ -932,6 +939,18 @@ __pmp_skip:
 
 	/* Save trap based detection of Zicntr */
 	has_zicntr = sbi_hart_has_extension(scratch, SBI_HART_EXT_ZICNTR);
+
+	/* Detect if hart has Smctr CSRs */
+	csr_read_allowed(CSR_MCTRCTL, (unsigned long)&trap);
+	if (!trap.cause)
+		__sbi_hart_update_extension(hfeatures, SBI_HART_EXT_SMCTR,
+					    true);
+
+	/* Detect if hart has Ssctr CSRs */
+	csr_read_allowed(CSR_SCTRCTL, (unsigned long)&trap);
+	if (!trap.cause)
+		__sbi_hart_update_extension(hfeatures, SBI_HART_EXT_SSCTR,
+					    true);
 
 	/* Let platform populate extensions */
 	rc = sbi_platform_extensions_init(sbi_platform_thishart_ptr(),
