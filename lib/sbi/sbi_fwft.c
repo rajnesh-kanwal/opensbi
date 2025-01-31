@@ -59,6 +59,8 @@ static const unsigned long fwft_defined_features[] = {
 	SBI_FWFT_SHADOW_STACK,
 	SBI_FWFT_DOUBLE_TRAP,
 	SBI_FWFT_PTE_AD_HW_UPDATING,
+	SBI_FWFT_POINTER_MASKING_PMLEN,
+	SBI_FWFT_CONTROL_TRANSFER_RECORD,
 };
 
 static bool fwft_is_defined_feature(enum sbi_fwft_feature_t feature)
@@ -141,6 +143,28 @@ static int fwft_get_adue(struct fwft_config *conf, unsigned long *value)
 	cfg = csr_read(CSR_MENVCFG) & ENVCFG_ADUE;
 #endif
 	*value = cfg != 0;
+
+	return SBI_OK;
+}
+
+static int fwft_ctr_supported(struct fwft_config *conf)
+{
+	if (!sbi_hart_has_extension(sbi_scratch_thishart_ptr(),
+				    SBI_HART_EXT_SSCTR))
+		return SBI_ENOTSUPP;
+
+	return SBI_OK;
+}
+
+static int fwft_set_ctr(struct fwft_config *conf, unsigned long value)
+{
+	/* CTR is enabled by default and can not be disabled. */
+	return SBI_EDENIED;
+}
+
+static int fwft_get_ctr(struct fwft_config *conf, unsigned long *value)
+{
+	*value = (csr_read(CSR_MSTATEEN0) & SMSTATEEN0_CTR) != 0;
 
 	return SBI_OK;
 }
@@ -235,6 +259,12 @@ static const struct fwft_feature features[] =
 		.supported = fwft_adue_supported,
 		.set = fwft_set_adue,
 		.get = fwft_get_adue,
+	},
+	{
+		.id = SBI_FWFT_CONTROL_TRANSFER_RECORD,
+		.supported = fwft_ctr_supported,
+		.set = fwft_set_ctr,
+		.get = fwft_get_ctr,
 	},
 };
 
